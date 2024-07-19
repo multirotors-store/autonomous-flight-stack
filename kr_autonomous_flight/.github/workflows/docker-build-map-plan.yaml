@@ -1,0 +1,52 @@
+name: docker-build-map-plan
+
+# Build map-plan when "control" changes, or when any files in the map_plan
+# folder are modified
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["docker-build-control"]
+    branches: [master]
+    types:
+      - completed
+  push:
+    paths:
+    - 'autonomy_core/map_plan/**'
+    branches: [master]
+  # DO NOT add a schedule. This build will be triggered by base schedule.
+
+jobs:
+  main:
+    runs-on: ubuntu-20.04
+
+    steps:
+      -
+        # This action is now required because we are building with context,
+        # required to clone a third party repo
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: kumarrobotics/autonomy:map_plan
+          file: ./autonomy_core/map_plan/Dockerfile
+          platforms: linux/amd64,linux/arm64
+      -
+        name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
